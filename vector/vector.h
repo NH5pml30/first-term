@@ -4,7 +4,6 @@
 #define VECTOR_H
 
 #include <cstring>
-#include <cassert>
 #include <algorithm>
 
 template<typename T>
@@ -13,7 +12,7 @@ struct vector
   typedef T * iterator;
   typedef const T * const_iterator;
 
-  vector();                               // O(1) nothrow
+  vector() = default;                     // O(1) nothrow
   vector(const vector &);                 // O(N) strong
   vector & operator=(const vector &other); // O(N) strong
 
@@ -62,29 +61,34 @@ private:
   T *data_ = nullptr;
   size_t size_ = 0;
   size_t capacity_ = 0;
+
+  static void destroy_at(T *data, size_t at);
+  static void destroy_n(T *data, size_t begin, size_t end);
+  static void copy_construct_at(T *data, size_t at, const T &other);
+  static void copy_construct_n(T *data, size_t begin, size_t end, T *other, size_t other_begin);
 };
 
 template<typename T>
-void destroy_at(T *data, size_t at)
+void vector<T>::destroy_at(T *data, size_t at)
 {
   data[at].~T();
 }
 
 template<typename T>
-void destroy_n(T *data, size_t begin, size_t end)
+void vector<T>::destroy_n(T *data, size_t begin, size_t end)
 {
   for (size_t i = end; i > begin; i--)
     destroy_at(data, i - 1);
 }
 
 template<typename T>
-void copy_construct_at(T *data, size_t at, const T &other)
+void vector<T>::copy_construct_at(T *data, size_t at, const T &other)
 {
   new(data + at) T(other);
 }
 
-template<typename T, typename ...ArgTypes>
-void copy_construct_n(T *data, size_t begin, size_t end, T *other, size_t other_begin)
+template<typename T>
+void vector<T>::copy_construct_n(T *data, size_t begin, size_t end, T *other, size_t other_begin)
 {
   size_t i = 0;
 
@@ -124,7 +128,6 @@ void vector<T>::new_buffer(size_t new_capacity)
   operator delete(data_);
   data_ = new_data;
   capacity_ = new_capacity;
-  return;
 }
 
 template<typename T>
@@ -133,11 +136,6 @@ void vector<T>::ensure_capacity(size_t new_capacity)
   if (capacity_ >= new_capacity)
     return;
   new_buffer(std::max(capacity_ * 3 / 2, new_capacity));
-}
-
-template<typename T>
-vector<T>::vector()
-{
 }
 
 template<typename T>
@@ -151,10 +149,7 @@ vector<T>::vector(const vector &other)
 template<typename T>
 vector<T> & vector<T>::operator=(const vector &other) {
   if (this != &other)
-  {
-    vector swapper(other);
-    swap(swapper);
-  }
+    vector(other).swap(*this);
   return *this;
 }
 
@@ -168,14 +163,12 @@ vector<T>::~vector()
 template<typename T>
 T & vector<T>::operator[](size_t i)
 {
-  assert(i < size_);
   return data_[i];
 }
 
 template<typename T>
 const T & vector<T>::operator[](size_t i) const
 {
-  assert(i < size_);
   return data_[i];
 }
 
@@ -200,28 +193,24 @@ size_t vector<T>::size() const
 template<typename T>
 T & vector<T>::front()
 {
-  assert(size_ != 0);
   return data_[0];
 }
 
 template<typename T>
 const T & vector<T>::front() const
 {
-  assert(size_ != 0);
   return data_[0];
 }
 
 template<typename T>
 T & vector<T>::back()
 {
-  assert(size_ != 0);
   return data_[size_ - 1];
 }
 
 template<typename T>
 const T & vector<T>::back() const
 {
-  assert(size_ != 0);
   return data_[size_ - 1];
 }
 
@@ -245,7 +234,6 @@ void vector<T>::push_back(const T &other)
 template<typename T>
 void vector<T>::pop_back()
 {
-  assert(size_ != 0);
   destroy_at(data_, --size_);
 }
 
@@ -316,8 +304,7 @@ typename vector<T>::const_iterator vector<T>::end() const
 template<typename T>
 typename vector<T>::iterator vector<T>::insert(const_iterator pos, const T &val)
 {
-  size_t before = pos - begin();
-  assert(before <= size_);
+  size_t before = static_cast<size_t>(pos - begin());
 
   push_back(val);
   for (size_t i = size_ - 1; i > before; i--)
@@ -335,8 +322,7 @@ typename vector<T>::iterator vector<T>::erase(const_iterator pos)
 template<typename T>
 typename vector<T>::iterator vector<T>::erase(const_iterator first, const_iterator last)
 {
-  size_t l = first - begin(), r = last - begin();
-  assert(l < size_ && r <= size_ && l <= r);
+  size_t l = static_cast<size_t>(first - begin()), r = static_cast<size_t>(last - begin());
   size_t dst, src;
   for (dst = l, src = r; src < size_; dst++, src++)
     std::swap(data_[dst], data_[src]);
