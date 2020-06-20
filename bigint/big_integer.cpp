@@ -522,7 +522,7 @@ big_integer & big_integer::bit_shift(int rhs)
                                 get_or_default(rhs < 0 ? (int)data.size() : -1));
   for (size_t i = std::max(places, 0); i < data.size() + places + (bits > 0); i++)
   {
-    // handle 64 shift undefined behavior with cases
+    // handle PLACE_BITS shift undefined behavior with cases
     if (bits == 0)
       new_data[i] = data[i - places];
     else
