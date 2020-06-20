@@ -12,7 +12,7 @@
 #include <optional>
 #include <variant>
 
-class big_integer
+struct big_integer
 {
 /* all public functions provide weak exception guarantee (invariant holds) */
 private:
