@@ -60,6 +60,9 @@ namespace big_int_util
     void unshare_resize(size_t new_size = -1, place_t default_val = place_t{0});
 
   public:
+    using iterator = place_t *;
+    using const_iterator = const place_t *;
+
     optimized_buffer(size_t size, place_t default_val);
     optimized_buffer(const std::vector<place_t> &vec);
     optimized_buffer(const optimized_buffer &other);
@@ -81,10 +84,10 @@ namespace big_int_util
     const place_t * data() const;
     place_t * data();
 
-    place_t * begin();
-    const place_t * begin() const;
-    place_t * end();
-    const place_t * end() const;
+    iterator begin();
+    const_iterator begin() const;
+    iterator end();
+    const_iterator end() const;
 
     bool operator==(const optimized_buffer &other) const;
     bool operator!=(const optimized_buffer &other) const;
@@ -283,22 +286,22 @@ namespace big_int_util
   }
 
   template<typename place_t, size_t reserved>
-  place_t * optimized_buffer<place_t, reserved>::begin()
+  typename optimized_buffer<place_t, reserved>::iterator optimized_buffer<place_t, reserved>::begin()
   {
     return data();
   }
   template<typename place_t, size_t reserved>
-  const place_t * optimized_buffer<place_t, reserved>::begin() const
+  typename optimized_buffer<place_t, reserved>::const_iterator optimized_buffer<place_t, reserved>::begin() const
   {
     return data();
   }
   template<typename place_t, size_t reserved>
-  place_t * optimized_buffer<place_t, reserved>::end()
+  typename optimized_buffer<place_t, reserved>::iterator optimized_buffer<place_t, reserved>::end()
   {
     return begin() + size_;
   }
   template<typename place_t, size_t reserved>
-  const place_t * optimized_buffer<place_t, reserved>::end() const
+  typename optimized_buffer<place_t, reserved>::const_iterator optimized_buffer<place_t, reserved>::end() const
   {
     return begin() + size_;
   }
