@@ -9,8 +9,6 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include <optional>
-#include <variant>
 
 struct big_integer
 {
@@ -28,7 +26,7 @@ private:
 
 public:
   big_integer();
-  big_integer(const big_integer &other);
+  big_integer(const big_integer &other) = default;
   big_integer(int a);
   explicit big_integer(std::string const &str);
   ~big_integer();
@@ -79,7 +77,7 @@ private:
 
   /* Invariant-changing functions */
   // corrects sign & invariant
-  big_integer & correct_sign_bit(bool expected_sign_bit, std::optional<place_t> carry = {});
+  big_integer & correct_sign_bit(bool expected_sign_bit, place_t carry = 0);
   // corrects invariant
   big_integer & shrink();
   // destroys invariant, inflating data
