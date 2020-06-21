@@ -9,8 +9,6 @@
 #include <vector>
 #include <string>
 #include <functional>
-#include <optional>
-#include <variant>
 
 #include "optimized_buffer.h"
 
@@ -82,7 +80,7 @@ private:
 
   /* Invariant-changing functions */
   // corrects sign & invariant
-  big_integer & correct_sign_bit(bool expected_sign_bit, std::optional<place_t> carry = {});
+  big_integer & correct_sign_bit(bool expected_sign_bit, place_t carry = 0);
   // corrects invariant
   big_integer & shrink();
   // destroys invariant, inflating data
