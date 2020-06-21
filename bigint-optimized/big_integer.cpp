@@ -47,16 +47,16 @@ size_t big_integer::unsigned_size() const
   return std::max(size_t{1}, data.size() - (data.back() == default_place()));
 }
 
-big_integer & big_integer::correct_sign_bit(bool expected_sign_bit, std::optional<place_t> carry)
+big_integer & big_integer::correct_sign_bit(bool expected_sign_bit, place_t carry)
 {
   // invariant does not hold for now
   // zero is always accepted, but could be non-shrinked
   try
   {
-    if (carry.has_value())
-      data.push_back(carry.value());
+    if (carry != 0)
+      data.push_back(carry);
     if (sign_bit() != expected_sign_bit && !(expected_sign_bit &&
-      std::all_of(data.begin(), data.end(), [](auto i) { return i == 0; })))
+      std::all_of(data.begin(), data.end(), [](place_t i) { return i == 0; })))
       data.push_back(::default_place<place_t>(expected_sign_bit));
   }
   catch (...)
@@ -189,7 +189,7 @@ template<typename type>
     return left + right + old_carry;
   }
 
-static inline uint32_t low_bytes(uint64_t x) { return x & 0xFFFF'FFFF; }
+static inline uint32_t low_bytes(uint64_t x) { return x & 0xFFFFFFFF; }
 static inline uint32_t high_bytes(uint64_t x) { return x >> 32; }
 
 static std::pair<uint64_t, uint64_t> mul(uint64_t left, uint64_t right)
@@ -245,7 +245,7 @@ static std::pair<uint64_t, uint32_t> sub_5_digits(uint64_t lhs_low, uint32_t lhs
 {
   if (at == 0)
   {
-    uint64_t l64 = (uint64_t{lhs_high & 0x0000'FFFF} << 48)| (lhs_low >> 16);
+    uint64_t l64 = (uint64_t{lhs_high & 0x0000FFFF} << 48)| (lhs_low >> 16);
     bool borrow = 0;
     l64 = addc(l64, ~rhs_low + 1, borrow);
     uint16_t l16 = lhs_high >> 16;
@@ -253,7 +253,7 @@ static std::pair<uint64_t, uint32_t> sub_5_digits(uint64_t lhs_low, uint32_t lhs
     borrow = 0;
     l16 = addc(l16, (uint16_t)(~rhs_high + 1), borrow);
     lhs_high = (uint32_t{l16} << 16) | (uint32_t)(l64 >> 48);
-    lhs_low = (l64 << 16) | (lhs_low & 0x0000'FFFF);
+    lhs_low = (l64 << 16) | (lhs_low & 0x0000FFFF);
   }
   else
   {
@@ -353,13 +353,13 @@ big_integer & big_integer::short_multiply(place_t rhs)
   place_t carry = 0;
   iterate([&](place_t datai)
     {
-      auto [res, new_carry] = mul(datai, rhs);
+      auto res_carry = mul(datai, rhs);
       bool add_carry = false;
-      place_t result = addc(res, carry, add_carry);
-      carry = addc(new_carry, place_t{ 0 }, add_carry);
+      place_t result = addc(res_carry.first, carry, add_carry);
+      carry = addc(res_carry.second, place_t{ 0 }, add_carry);
       return result;
     });
-  correct_sign_bit(0, carry == 0 ? std::optional<place_t>() : carry);
+  correct_sign_bit(0, carry);
   return revert_sign(old_sign);
 }
 
@@ -385,9 +385,9 @@ big_integer & big_integer::short_divide(place_t rhs, place_t &rem)
   rem = 0;
   iterate_r([&](place_t datai)
     {
-      auto [res, new_rem] = div2_1(datai, rem, rhs);
-      rem = new_rem;
-      return res;
+      auto res_rem = div2_1(datai, rem, rhs);
+      rem = res_rem.second;
+      return res_rem.first;
     });
   return shrink();
 }
@@ -481,17 +481,17 @@ big_integer & big_integer::operator%=(const big_integer &rhs)
 
 big_integer & big_integer::operator&=(const big_integer &rhs)
 {
-  return place_wise(rhs, [](place_t l, place_t r) { return l & r; });
+  return place_wise(rhs, std::bit_and<place_t>());
 }
 
 big_integer & big_integer::operator|=(const big_integer &rhs)
 {
-  return place_wise(rhs, std::bit_or<>());
+  return place_wise(rhs, std::bit_or<place_t>());
 }
 
 big_integer & big_integer::operator^=(const big_integer &rhs)
 {
-  return place_wise(rhs, [](place_t l, place_t r) { return l ^ r; });
+  return place_wise(rhs, std::bit_xor<place_t>());
 }
 
 big_integer & big_integer::operator<<=(int rhs)
@@ -547,7 +547,7 @@ big_integer big_integer::operator-() const
 
 big_integer big_integer::operator~() const
 {
-  return big_integer().place_wise(*this, [](auto x, auto y) { return ~y; });
+  return big_integer().place_wise(*this, [](place_t x, place_t y) { return ~y; });
 }
 
 big_integer & big_integer::operator++()
@@ -644,8 +644,11 @@ int big_integer::compare(const big_integer &l, const big_integer &r)
   const place_t *ldata = l.data.data(), *rdata = r.data.data();
   size_t s = l.unsigned_size();
   for (size_t i = 0; i < s; i++)
-    if (place_t a = ldata[s - i - 1], b = rdata[s - i - 1]; a != b)
+  {
+    place_t a = ldata[s - i - 1], b = rdata[s - i - 1];
+    if (a != b)
       return a > b ? 1 : -1;
+  }
   return 0;
 }
 
