@@ -22,10 +22,10 @@ big_integer::place_t big_integer::default_place() const
   return ::default_place<place_t>(sign_bit());
 }
 
-big_integer::place_t big_integer::get_or_default(int at) const
+big_integer::place_t big_integer::get_or_default(int64_t at) const
 {
   if (at < 0) return 0;
-  if ((size_t)at >= data.size()) return default_place();
+  if (static_cast<size_t>(at) >= data.size()) return default_place();
   return data[at];
 }
 
@@ -83,35 +83,36 @@ bool big_integer::make_absolute()
   return sign;
 }
 
-void big_integer::iterate(const big_integer &b,
-  const std::function<place_t (place_t, place_t)> &action)
+void big_integer::iterate(const big_integer &b, const binary_operator &action)
 {
   resize(std::max(data.size(), b.data.size()));
   auto l_end = data.end();
   auto r_end = b.data.end(), r_it = b.data.begin();
-  for (auto it = data.begin(); it != l_end;
-       it++, r_it = r_it == r_end ? r_it : std::next(r_it))
+  for (auto it = data.begin(); it != l_end; it++)
+  {
     *it = action(*it, r_it >= r_end ? b.default_place() : *r_it);
+    if (r_it != r_end) r_it++;
+  }
 }
-void big_integer::iterate(const std::function<place_t (place_t)> &action)
+void big_integer::iterate(const unary_operator &action)
 {
   auto end = data.end();
   for (auto it = data.begin(); it != end; it++)
     *it = action(*it);
 }
-void big_integer::iterate_r(const std::function<place_t (place_t)> &action)
+void big_integer::iterate_r(const unary_operator &action)
 {
   auto begin = data.begin();
   for (auto it = data.end(); it != begin; it--)
     *(it - 1) = action(*(it - 1));
 }
-void big_integer::iterate(const std::function<void (place_t)> &action) const
+void big_integer::iterate(const unary_consumer &action) const
 {
   auto end = data.end();
   for (auto it = data.begin(); it != end; it++)
     action(*it);
 }
-void big_integer::iterate_r(const std::function<void (place_t)> &action) const
+void big_integer::iterate_r(const unary_consumer &action) const
 {
   auto begin = data.begin();
   for (auto it = data.end(); it != begin; it--)
@@ -119,7 +120,7 @@ void big_integer::iterate_r(const std::function<void (place_t)> &action) const
 }
 
 big_integer & big_integer::place_wise(const big_integer &b,
-  const std::function<place_t (place_t l, place_t r)> &action)
+  const binary_operator &action)
 {
   iterate(b, action);
   return shrink();
@@ -181,28 +182,29 @@ big_integer & big_integer::operator=(const big_integer &other)
 template<typename type>
   static type addc(type left, type right, bool &carry)
   {
-    using limit = std::numeric_limits<type>;
+    static constexpr auto limit_max = std::numeric_limits<type>::max();
     bool old_carry = carry;
-    carry = (limit::max() - left < right ||
-             (left == limit::max() && carry == 1) ||
-             limit::max() - left - carry < right);
+    carry = (limit_max - left < right ||
+             (left == limit_max && carry == 1) ||
+             limit_max - left - carry < right);
     return left + right + old_carry;
   }
 
 static inline uint32_t low_bytes(uint64_t x) { return x & 0xFFFFFFFF; }
 static inline uint32_t high_bytes(uint64_t x) { return x >> 32; }
+static inline uint16_t low_bytes(uint32_t x) { return x & 0xFFFF; }
+static inline uint16_t high_bytes(uint32_t x) { return x >> 16; }
 
 static std::pair<uint64_t, uint64_t> mul(uint64_t left, uint64_t right)
 {
-  uint64_t
-    left_low = low_bytes(left),
-    right_low = low_bytes(right),
-    left_high = high_bytes(left),
-    right_high = high_bytes(right),
-    bd = left_low * right_low,
-    ad = left_high * right_low,
-    bc = left_low * right_high,
-    ac = left_high * right_high;
+  uint64_t left_low = low_bytes(left);
+  uint64_t right_low = low_bytes(right);
+  uint64_t left_high = high_bytes(left);
+  uint64_t right_high = high_bytes(right);
+  uint64_t bd = left_low * right_low;
+  uint64_t ad = left_high * right_low;
+  uint64_t bc = left_low * right_high;
+  uint64_t ac = left_high * right_high;
 
   // res = ac * 2^64 + (ad + bc) * 2^32 + bd
 
@@ -235,7 +237,7 @@ static uint64_t get_3_digits(uint64_t low, uint32_t high, int at)
   case 0:
     return (uint64_t{high} << 16) | (low >> 48);
   case 1:
-    return (uint64_t{high << 16} << 16) | (low >> 32);
+    return (uint64_t{low_bytes(high)} << 32) | (low >> 32);
   }
   return 0;
 }
@@ -245,15 +247,15 @@ static std::pair<uint64_t, uint32_t> sub_5_digits(uint64_t lhs_low, uint32_t lhs
 {
   if (at == 0)
   {
-    uint64_t l64 = (uint64_t{lhs_high & 0x0000FFFF} << 48)| (lhs_low >> 16);
+    uint64_t l64 = (uint64_t{low_bytes(lhs_high)} << 48)| (lhs_low >> 16);
     bool borrow = 0;
     l64 = addc(l64, ~rhs_low + 1, borrow);
-    uint16_t l16 = lhs_high >> 16;
+    uint16_t l16 = high_bytes(lhs_high);
     l16 -= borrow;
     borrow = 0;
     l16 = addc(l16, (uint16_t)(~rhs_high + 1), borrow);
     lhs_high = (uint32_t{l16} << 16) | (uint32_t)(l64 >> 48);
-    lhs_low = (l64 << 16) | (lhs_low & 0x0000FFFF);
+    lhs_low = (l64 << 16) | low_bytes(lhs_low);
   }
   else
   {
@@ -430,21 +432,19 @@ big_integer & big_integer::long_divide(const big_integer &rhs, big_integer &rem)
     d.short_multiply(f);
 
     // 2 leading digits of divisor for quotient digits estimate
-    place_t
-      d2_high = d.data[m - 1],
-      d2_low = d.data[m - 2];
+    place_t d2_high = d.data[m - 1];
+    place_t d2_low = d.data[m - 2];
     // compute quotient digits
     std::vector<place_t> new_data(n - m + 1);
     for (size_t ki = 0; ki <= n - m; ki++)
     {
       int k = (int)(n - m - ki);
-      place_t
-        // first, count 3 leading digits of remainder
-        r3_high = k + m >= rem.data.size() ? 0 : rem.data[k + m],
-        r3_med = k + m - 1 >= rem.data.size() ? 0 : rem.data[k + m - 1],
-        r3_low = k + m - 2 >= rem.data.size() ? 0 : rem.data[k + m - 2],
+      // first, count 3 leading digits of remainder
+      place_t r3_high = k + m >= rem.data.size() ? 0 : rem.data[k + m];
+      place_t r3_med = k + m - 1 >= rem.data.size() ? 0 : rem.data[k + m - 1];
+      place_t r3_low = k + m - 2 >= rem.data.size() ? 0 : rem.data[k + m - 2];
         // obtain k-th digit estimate
-        qt = div3_2(r3_low, r3_med, r3_high, d2_low, d2_high).first;
+      place_t qt = div3_2(r3_low, r3_med, r3_high, d2_low, d2_high).first;
       // count result with estimate
       big_integer dq = big_integer(d).short_multiply(qt) <<= k * PLACE_BITS;
       if (rem < dq)
@@ -517,7 +517,8 @@ big_integer & big_integer::bit_shift(int rhs)
   if (rhs < 0 && bits != 0)
     places--, bits += PLACE_BITS;
   std::vector<place_t> new_data(std::max(data.size() + places + (bits > 0), size_t{1}),
-                                get_or_default(rhs < 0 ? (int)data.size() : -1));
+                                get_or_default(rhs < 0 ?
+                                  static_cast<int64_t>(data.size()) : -1));
   for (size_t i = std::max(places, 0); i < data.size() + places + (bits > 0); i++)
   {
     // handle PLACE_BITS shift undefined behavior with cases
@@ -526,8 +527,8 @@ big_integer & big_integer::bit_shift(int rhs)
     else
     {
       place_t
-        lsrc = get_or_default((int)i - places),
-        rsrc = get_or_default((int)i - places - 1);
+        lsrc = get_or_default(static_cast<int64_t>(i) - places),
+        rsrc = get_or_default(static_cast<int64_t>(i) - places - 1);
       new_data[i] = (lsrc << bits) | (rsrc >> (PLACE_BITS - bits));
     }
   }
@@ -686,14 +687,14 @@ std::string to_string(const big_integer &a)
 {
   big_integer c = a;
   bool sgn = c.make_absolute();
-  std::vector<char> reverse;
+  std::string reverse;
   if (c == 0)
     reverse.push_back('0');
   while (c != 0)
   {
     uint32_t rem;
     c.short_divide(10, rem);
-    reverse.push_back((char)((char)rem + '0'));
+    reverse += static_cast<char>((static_cast<char>(rem) + '0'));
   }
   if (sgn)
     reverse.push_back('-');
