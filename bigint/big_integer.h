@@ -93,16 +93,20 @@ private:
   size_t size() const;
   size_t unsigned_size() const;
   place_t default_place() const;
-  place_t get_or_default(int at) const;
+  place_t get_or_default(int64_t at) const;
 
   /* Useful iterating functions */
-  void iterate(const big_integer &b, const std::function<place_t (place_t, place_t)> &action);
-  void iterate(const std::function<place_t (place_t)> &action);
-  void iterate_r(const std::function<place_t (place_t)> &action);
-  void iterate(const std::function<void (place_t)> &action) const;
-  void iterate_r(const std::function<void (place_t)> &action) const;
+  using binary_operator = std::function<place_t (place_t, place_t)>;
+  using unary_operator = std::function<place_t (place_t)>;
+  using unary_consumer = std::function<void (place_t)>;
+
+  void iterate(const big_integer &b, const binary_operator &action);
+  void iterate(const unary_operator &action);
+  void iterate_r(const unary_operator &action);
+  void iterate(const unary_consumer &action) const;
+  void iterate_r(const unary_consumer &action) const;
   big_integer & place_wise(const big_integer &b,
-    const std::function<place_t (place_t, place_t)> &action);
+    const binary_operator &action);
 };
 
 big_integer operator+(big_integer a, const big_integer &b);
