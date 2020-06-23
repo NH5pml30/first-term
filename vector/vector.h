@@ -142,7 +142,17 @@ template<typename T>
 vector<T>::vector(const vector &other)
 {
   new_buffer(other.size_);
-  copy_construct_n(data_, 0, other.size_, other.data_, 0);
+  try
+  {
+    copy_construct_n(data_, 0, other.size_, other.data_, 0);
+  }
+  catch (...)
+  {
+    operator delete(data_);
+    data_ = nullptr;
+    size_ = capacity_ = 0;
+    throw;
+  }
   size_ = other.size_;
 }
 
