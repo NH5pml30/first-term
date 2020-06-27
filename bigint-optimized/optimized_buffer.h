@@ -91,6 +91,7 @@ namespace big_int_util
     void allocate(size_t new_size, uint32_t default_val = 0, const uint32_t *old_data = nullptr, size_t old_size = 0);
     void unshare(size_t new_size = static_cast<size_t>(-1), uint32_t default_val = 0);
     void static_inflate(size_t new_size, uint32_t default_val = 0);
+    void swap_static_dynamic(optimized_buffer &other);
 
   public:
     using iterator = uint32_t *;
