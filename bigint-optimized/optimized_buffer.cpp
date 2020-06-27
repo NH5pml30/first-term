@@ -87,6 +87,14 @@ optimized_buffer & optimized_buffer::operator=(const optimized_buffer &other)
   return *this;
 }
 
+void optimized_buffer::swap_static_dynamic(optimized_buffer &other)
+{
+  assert(is_static_data());
+  shared_buffer_t *tmp = other.dynamic_data;
+  std::copy_n(static_data, size(), other.static_data);
+  dynamic_data = tmp;
+}
+
 void optimized_buffer::swap(optimized_buffer &other)
 {
   if (this == &other)
@@ -102,17 +110,12 @@ void optimized_buffer::swap(optimized_buffer &other)
     }
     else
     {
-      shared_buffer_t *tmp = other.dynamic_data;
-      std::copy_n(static_data, size(), other.static_data);
-      dynamic_data = tmp;
+      swap_static_dynamic(other);
     }
   }
   else if (other.is_static_data())
   {
-    uint32_t buffer[STATIC_BUFFER_SIZE];
-    std::copy_n(other.static_data, other.size(), buffer);
-    other.dynamic_data = dynamic_data;
-    std::copy_n(buffer, other.size(), static_data);
+    other.swap_static_dynamic(*this);
   }
   else
   {
