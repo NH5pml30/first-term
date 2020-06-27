@@ -19,7 +19,7 @@ private:
   // digit type -- only uint32_t supported because of division
   using place_t = uint32_t;
   // reserve 2 places for sign & carry
-  using storage_t = big_int_util::optimized_buffer<place_t, 2>;
+  using storage_t = big_int_util::optimized_buffer;
 
   // invariant:
   // sign -- highest bit in last place (1 -- negative)

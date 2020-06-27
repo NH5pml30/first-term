@@ -8,6 +8,7 @@ include_directories(${BIGINT_SOURCE_DIR})
 add_executable(big_integer_testing
                big_integer_testing.cpp
                optimized_buffer.h
+               optimized_buffer.cpp
                big_integer.h
                big_integer.cpp
                gtest/gtest-all.cc
