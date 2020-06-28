@@ -39,6 +39,33 @@ namespace big_int_util
       return ref_count == 1;
     }
 
+    static shared_buffer * allocate(size_t new_size, uint32_t default_val, const uint32_t *old_data, size_t old_size)
+    {
+      shared_buffer *res = allocate_buffer(new_size > old_size ? std::max(old_size * 3 / 2, new_size) : new_size);
+      if (old_data != nullptr)
+      {
+        std::copy_n(old_data, std::min(old_size, new_size), res->data);
+      }
+      if (new_size > old_size)
+      {
+        std::fill(res->data + old_size, res->data + new_size, default_val);
+      }
+      return res;
+    }
+
+    static shared_buffer * unshare(shared_buffer *self, size_t size, size_t new_size, uint32_t default_val)
+    {
+      shared_buffer *res = allocate(new_size, default_val, self->data, size);
+      release(self);
+      return res;
+    }
+
+    static shared_buffer * ensure_unique(shared_buffer *self, size_t size)
+    {
+      if (self->is_unique()) return self;
+      return unshare(self, size, size, 0);
+    }
+
     static void release(shared_buffer *self)
     {
       if (self == nullptr)
