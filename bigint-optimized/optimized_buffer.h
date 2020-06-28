@@ -22,16 +22,21 @@ namespace big_int_util
     static shared_buffer * allocate_buffer(size_t capacity)
     {
       shared_buffer *self = static_cast<shared_buffer *>(operator new(sizeof(shared_buffer) +
-        sizeof(place_t) * capacity));
+                                                                      sizeof(place_t) * capacity));
       self->ref_count = 1;
       self->capacity = capacity;
       return self;
     }
 
-    static shared_buffer * add_ref(shared_buffer *self)
+    shared_buffer * add_ref()
     {
-      self->ref_count++;
-      return self;
+      ref_count++;
+      return this;
+    }
+
+    bool is_unique()
+    {
+      return ref_count == 1;
     }
 
     static void release(shared_buffer *self)
@@ -89,9 +94,11 @@ namespace big_int_util
     }
 
     void allocate(size_t new_size, uint32_t default_val = 0, const uint32_t *old_data = nullptr, size_t old_size = 0);
-    void unshare(size_t new_size = static_cast<size_t>(-1), uint32_t default_val = 0);
+    void unshare(size_t new_size, uint32_t default_val = 0);
+    void unshare();
+    void ensure_unique();
     void static_inflate(size_t new_size, uint32_t default_val = 0);
-    void swap_static_dynamic(optimized_buffer &other);
+    void swap_static_dynamic_data(optimized_buffer &other);
 
   public:
     using iterator = uint32_t *;
@@ -109,7 +116,7 @@ namespace big_int_util
       return size_ & ~STATE_MASK;
     }
 
-    void resize(size_t new_size, uint32_t default_val);
+    void resize(size_t new_size, uint32_t default_val = 0);
 
     uint32_t back() const;
     uint32_t & back();
