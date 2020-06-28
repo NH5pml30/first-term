@@ -6,15 +6,7 @@ namespace big_int_util
   void optimized_buffer::allocate(size_t new_size, uint32_t default_val, const uint32_t *old_data, size_t old_size)
   {
     set_is_dynamic_data();
-    dynamic_data = shared_buffer_t::allocate_buffer(new_size > old_size ? std::max(old_size * 3 / 2, new_size) : new_size);
-    if (old_data != nullptr)
-    {
-      std::copy_n(old_data, std::min(old_size, new_size), dynamic_data->data);
-    }
-    if (new_size > old_size)
-    {
-      std::fill(dynamic_data->data + old_size, dynamic_data->data + new_size, default_val);
-    }
+    dynamic_data = shared_buffer_t::allocate(new_size, default_val, old_data, old_size);
     set_size(new_size);
   }
 
@@ -27,14 +19,13 @@ namespace big_int_util
   {
     assert(is_dynamic_data() && (new_size > dynamic_data->capacity || !dynamic_data->is_unique()));
 
-    shared_buffer_t *old_data = dynamic_data;
-    allocate(new_size, default_val, old_data->data, size());
-    shared_buffer_t::release(old_data);
+    dynamic_data = shared_buffer_t::unshare(dynamic_data, size(), new_size, default_val);
+    set_size(new_size);
   }
 
   void optimized_buffer::ensure_unique()
   {
-    if (is_dynamic_data() && !dynamic_data->is_unique()) unshare();
+    if (is_dynamic_data()) dynamic_data = shared_buffer_t::ensure_unique(dynamic_data, size());
   }
 
   void optimized_buffer::static_inflate(size_t new_size, uint32_t default_val)
